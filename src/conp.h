@@ -51,6 +51,8 @@ public:
 
     void save_cache();
 
+    void printProgressInfo();
+
 public:
     int argc;
     char** argv;
@@ -80,6 +82,7 @@ public:
     double g_ewald_sq_inv;
     std::mutex mut;
     int cacheHitTimes = 0;
+    size_t progressCount;
 
     static std::unordered_map<double, double> cache;
     // Fourier coefficient of the Gaussian function used in the Ewald sum

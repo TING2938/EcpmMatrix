@@ -139,27 +139,28 @@ void Conp::kspaceThreadFunc(int rank)
             if (it != cache.end()) {
                 rKspace(ii, jj) = it->second;
                 cacheHitTimes++;
+                progressCount++;
                 mut.unlock();
                 continue;
-            } 
+            }
             mut.unlock();
 
             // (k,0,0), (0,l,0), (0,0,m)
             for (m = 1; m <= kmax; m++) {
                 sqk = m * m * squnitk[0];
                 if (sqk <= gsqmx) {
-                    rKspace(ii, jj) += fcCache1[m-1][0] * fast_cos(m * unitk[0] * dx[0]);
+                    rKspace(ii, jj) += fcCache1[m - 1][0] * fast_cos(m * unitk[0] * dx[0]);
                 }
 
                 sqk = m * m * squnitk[1];
                 if (sqk <= gsqmx) {
-                    rKspace(ii, jj) += fcCache1[m-1][1] * fast_cos(m * unitk[1] * dx[1]);
+                    rKspace(ii, jj) += fcCache1[m - 1][1] * fast_cos(m * unitk[1] * dx[1]);
                 }
 
                 sqk = m * m * squnitk[2];
                 if (sqk <= gsqmx) {
                     fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                    rKspace(ii, jj) += fcCache1[m-1][2] * fast_cos(m * unitk[2] * dx[2]);
+                    rKspace(ii, jj) += fcCache1[m - 1][2] * fast_cos(m * unitk[2] * dx[2]);
                 }
             }
 
@@ -178,7 +179,7 @@ void Conp::kspaceThreadFunc(int rank)
 
             // 1 = (0,l,m), 2 = (0,l,-m)
             for (m = 1; m <= kzmax; m++) {
-                for (l = 1; l <= kymax; l++) {               
+                for (l = 1; l <= kymax; l++) {
                     sqk = squnitk[1] * l * l + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
                         rKspace(ii, jj) += fcCache2[0][l][m] *
@@ -190,7 +191,7 @@ void Conp::kspaceThreadFunc(int rank)
 
             // 1 = (k,0,m), 2 = (k,0,-m)
             for (m = 1; m <= kzmax; m++) {
-                for (k = 1; k <= kxmax; k++) {                
+                for (k = 1; k <= kxmax; k++) {
                     sqk = squnitk[0] * k * k + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
                         rKspace(ii, jj) += fcCache2[k][0][m] *
@@ -203,7 +204,7 @@ void Conp::kspaceThreadFunc(int rank)
             // 1 = (k,l,m), 2 = (k,-l,m), 3 = (k,l,-m), 4 = (k,-l,-m)
             for (m = 1; m <= kzmax; m++) {
                 for (k = 1; k <= kxmax; k++) {
-                    for (l = 1; l <= kymax; l++) {                   
+                    for (l = 1; l <= kymax; l++) {
                         sqk = squnitk[0] * k * k + squnitk[1] * l * l + squnitk[2] * m * m;
                         if (sqk <= gsqmx) {
                             rKspace(ii, jj) += fcCache2[k][l][m] *
@@ -216,6 +217,7 @@ void Conp::kspaceThreadFunc(int rank)
             }
             mut.lock();
             cache[hash] = rKspace(ii, jj);
+            progressCount++;
             mut.unlock();
         }
     }
@@ -230,17 +232,17 @@ void Conp::calcKspaceFcCache()
     for (m = 1; m <= kmax; m++) {
         sqk = m * m * squnitk[0];
         if (sqk <= gsqmx) {
-            fcCache1[m-1][0] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+            fcCache1[m - 1][0] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
         }
 
         sqk = m * m * squnitk[1];
         if (sqk <= gsqmx) {
-            fcCache1[m-1][1] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+            fcCache1[m - 1][1] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
         }
 
         sqk = m * m * squnitk[2];
         if (sqk <= gsqmx) {
-            fcCache1[m-1][2] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+            fcCache1[m - 1][2] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
         }
     }
 
@@ -323,7 +325,7 @@ void Conp::calc_Matrix()
     calc_rSlab();
     timer.stop();
     fmt::print("calc_slab: {} s\n", timer.span());
-    
+
     rMatrix = rReal + rSlab + rSelf + rKspace;
 }
 
@@ -397,12 +399,16 @@ void Conp::get_EcpmMatrix()
         readGro(fileName);
         fmt::print("cache size: {}\n", cache.size());
         cacheHitTimes = 0;
+        progressCount = 1;
+        // print remained time info:
+        std::thread(&Conp::printProgressInfo, this).detach();
+
         timer.start();
         calc_Matrix();
         timer.stop();
         fmt::print("[{}] *** calculate matrix spend time: {} s\n", fileName, timer.span());
         fmt::print("cache hit times: {}\n", cacheHitTimes);
-        fmt::print("cache hit rate: {:4.2f} %\n", double(cacheHitTimes) / (natoms * (natoms+1)) * 200);
+        fmt::print("cache hit rate: {:4.2f} %\n", double(cacheHitTimes) / (natoms * (natoms + 1)) * 200);
 
         if (calcInv) {
             timer.start();
@@ -410,7 +416,7 @@ void Conp::get_EcpmMatrix()
             timer.stop();
             fmt::print("calculate inv: {} s\n", timer.span());
         }
-            
+
         timer.start();
         if (binary) {
             saveToBinaryFile("rMatrix_" + fileName + ".bin", rMatrix);
@@ -551,7 +557,7 @@ void Conp::cvtTextToBinaryFile()
     ss.clear();
     std::vector<float> data(column * column);
     int ndx = 0;
-    do 	{
+    do {
         ss.str(line);
         for (int i = 0; i < column; i++) {
             ss >> data[ndx++];
@@ -585,7 +591,7 @@ void Conp::saveToBinaryFile(std::string fnm, const Eigen::ArrayXXd& data)
 }
 
 double Conp::calc_hash(double dx[3])
-{   
+{
     return std::abs(dx[0]) * 800043.022364 + std::abs(dx[1]) * 4400.3234231 + std::abs(dx[2]) * 103.9262402;
 }
 
@@ -614,5 +620,33 @@ void Conp::save_cache()
     ofile.write((char*)(&length), sizeof(int));
     for (auto it = cache.begin(); it != cache.end(); it++) {
         ofile.write((char*)(&(*it)), sizeof(double) * 2);
+    }
+}
+
+void Conp::printProgressInfo()
+{
+    auto beginTime = std::chrono::system_clock::now();
+    int ncount = (natoms * (natoms + 1)) / 2;
+    while (true) {
+        auto endTime = beginTime + (std::chrono::system_clock::now() - beginTime) * ncount / progressCount;
+        auto t_c = std::chrono::system_clock::to_time_t(endTime);
+
+        auto remain = std::chrono::duration_cast<std::chrono::seconds>(endTime - std::chrono::system_clock::now());
+
+        itp::setScrollOutput();
+        if (remain.count() <= 240) {
+            std::cout << "Progress: {:.2f}%, "_format(100.0 * progressCount / ncount)
+                << "remaining wall clock time: " << remain.count() << " s" << std::string(20, ' ');
+        } else {
+            std::cout << "Progress: {:.2f}%, "_format(100.0 * progressCount / ncount)
+                << "will finish at " << std::put_time(std::localtime(&t_c), "%F %T");
+        }
+
+        if (progressCount >= ncount) {
+            fmt::print("\nFinished!\n");
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
