@@ -6,6 +6,7 @@
 #include <itp/timer>
 #include <filesystem>
 #include "fast_math.h"
+#include <omp.h>
 
 std::unordered_map<double, double> Conp::cache = {};
 
@@ -59,7 +60,8 @@ void Conp::calc_rReal()
     Eigen::ArrayX3d xall(natoms * 9, 3);
     Eigen::ArrayXXd ratio(9, 2);
     ratio << 0, 0, 0, 1, 0, -1, 1, 0, 1, 1, 1, -1, -1, 0, -1, 1, -1, -1;
-    for (int i = 0; i != natoms; ++i) {
+
+    for (int i = 0; i < natoms; i++) {
         for (int j = 0; j != ratio.rows(); ++j) {
             xall(i + natoms * j, 0) = x(i, 0) + box[0] * ratio(j, 0);
             xall(i + natoms * j, 1) = x(i, 1) + box[1] * ratio(j, 1);
@@ -67,10 +69,10 @@ void Conp::calc_rReal()
         }
     }
 
-    double r;
-    for (int i = 0; i != natoms; ++i) {
+#pragma omp parallel for num_threads(nthread)
+    for (int i = 0; i < natoms; i++) {
         for (int j = 0; j != natoms * 9; ++j) {
-            r = std::pow(x(i, 0) - xall(j, 0), 2) +
+            double r = std::pow(x(i, 0) - xall(j, 0), 2) +
                 std::pow(x(i, 1) - xall(j, 1), 2) +
                 std::pow(x(i, 2) - xall(j, 2), 2);
             if ((r < cutoff * cutoff) && r > 1e-7) {
@@ -102,24 +104,6 @@ void Conp::calc_rSlab()
 
 void Conp::calc_rKspace()
 {
-    for (int i = 0; i < 3; i++) {
-        unitk[i] = 2.0 * itp::pi / box[i];
-        squnitk[i] = unitk[i] * unitk[i];
-    }
-
-    kmax = std::max({ kxmax, kymax, kzmax});
-
-    double gsqxmx = squnitk[0] * kxmax * kxmax;
-    double gsqymx = squnitk[1] * kymax * kymax;
-    double gsqzmx = squnitk[2] * kzmax * kzmax;
-    gsqmx = std::max({ gsqxmx, gsqymx, gsqzmx }) * 1.00001;
-
-    g_ewald_sq_inv = -1.0 / (g_ewald * g_ewald) / 4;
-    
-    fmt::print("cache size: {}\n", cache.size());
-
-    itp::Timer timer;
-    timer.start();
     for (int i = 0; i != nthread; ++i) {
         thread.emplace_back(&Conp::kspaceThreadFunc, this, i);
     }
@@ -127,9 +111,6 @@ void Conp::calc_rKspace()
         if (i.joinable())
             i.join();
     }
-    timer.stop();
-    fmt::print("calc_kspace: {} s\n", timer.span());
-
     for (int ii = 0; ii < natoms; ii++) {
         for (int jj = 0; jj < ii; jj++) {
             rKspace(jj, ii) = rKspace(ii, jj);
@@ -167,20 +148,18 @@ void Conp::kspaceThreadFunc(int rank)
             for (m = 1; m <= kmax; m++) {
                 sqk = m * m * squnitk[0];
                 if (sqk <= gsqmx) {
-                    fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                    rKspace(ii, jj) += fc / 4 * fast_cos(m * unitk[0] * dx[0]);
+                    rKspace(ii, jj) += fcCache1[m-1][0] * fast_cos(m * unitk[0] * dx[0]);
                 }
 
                 sqk = m * m * squnitk[1];
                 if (sqk <= gsqmx) {
-                    fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                    rKspace(ii, jj) += fc / 4 * fast_cos(m * unitk[1] * dx[1]);
+                    rKspace(ii, jj) += fcCache1[m-1][1] * fast_cos(m * unitk[1] * dx[1]);
                 }
 
                 sqk = m * m * squnitk[2];
                 if (sqk <= gsqmx) {
                     fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                    rKspace(ii, jj) += fc / 4 * fast_cos(m * unitk[2] * dx[2]);
+                    rKspace(ii, jj) += fcCache1[m-1][2] * fast_cos(m * unitk[2] * dx[2]);
                 }
             }
 
@@ -190,8 +169,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (l = 1; l <= kymax; l++) {
                     sqk = squnitk[0] * k * k + squnitk[1] * l * l;
                     if (sqk <= gsqmx) {
-                        fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                        rKspace(ii, jj) += fc / 2 *
+                        rKspace(ii, jj) += fcCache2[k][l][0] *
                             fast_cos(k * unitk[0] * dx[0]) *
                             fast_cos(l * unitk[1] * dx[1]);
                     }
@@ -203,8 +181,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (l = 1; l <= kymax; l++) {               
                     sqk = squnitk[1] * l * l + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
-                        fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                        rKspace(ii, jj) += fc / 2 *
+                        rKspace(ii, jj) += fcCache2[0][l][m] *
                             fast_cos(l * unitk[1] * dx[1]) *
                             fast_cos(m * unitk[2] * dx[2]);
                     }
@@ -216,8 +193,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (k = 1; k <= kxmax; k++) {                
                     sqk = squnitk[0] * k * k + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
-                        fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                        rKspace(ii, jj) += fc / 2 *
+                        rKspace(ii, jj) += fcCache2[k][0][m] *
                             fast_cos(k * unitk[0] * dx[0]) *
                             fast_cos(m * unitk[2] * dx[2]);
                     }
@@ -230,8 +206,7 @@ void Conp::kspaceThreadFunc(int rank)
                     for (l = 1; l <= kymax; l++) {                   
                         sqk = squnitk[0] * k * k + squnitk[1] * l * l + squnitk[2] * m * m;
                         if (sqk <= gsqmx) {
-                            fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                            rKspace(ii, jj) += fc *
+                            rKspace(ii, jj) += fcCache2[k][l][m] *
                                 fast_cos(k * unitk[0] * dx[0]) *
                                 fast_cos(l * unitk[1] * dx[1]) *
                                 fast_cos(m * unitk[2] * dx[2]);
@@ -242,6 +217,73 @@ void Conp::kspaceThreadFunc(int rank)
             mut.lock();
             cache[hash] = rKspace(ii, jj);
             mut.unlock();
+        }
+    }
+}
+
+void Conp::calcKspaceFcCache()
+{
+    int k, l, m;
+    double sqk;
+
+    // (k,0,0), (0,l,0), (0,0,m)
+    for (m = 1; m <= kmax; m++) {
+        sqk = m * m * squnitk[0];
+        if (sqk <= gsqmx) {
+            fcCache1[m-1][0] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+        }
+
+        sqk = m * m * squnitk[1];
+        if (sqk <= gsqmx) {
+            fcCache1[m-1][1] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+        }
+
+        sqk = m * m * squnitk[2];
+        if (sqk <= gsqmx) {
+            fcCache1[m-1][2] = std::exp(sqk * g_ewald_sq_inv) / sqk / 4;
+        }
+    }
+
+    // 1 = (k,l,0), 2 = (k,-l,0)
+
+    for (k = 1; k <= kxmax; k++) {
+        for (l = 1; l <= kymax; l++) {
+            sqk = squnitk[0] * k * k + squnitk[1] * l * l;
+            if (sqk <= gsqmx) {
+                fcCache2[k][l][0] = std::exp(sqk * g_ewald_sq_inv) / sqk / 2;
+            }
+        }
+    }
+
+    // 1 = (0,l,m), 2 = (0,l,-m)
+    for (m = 1; m <= kzmax; m++) {
+        for (l = 1; l <= kymax; l++) {
+            sqk = squnitk[1] * l * l + squnitk[2] * m * m;
+            if (sqk <= gsqmx) {
+                fcCache2[0][l][m] = std::exp(sqk * g_ewald_sq_inv) / sqk / 2;
+            }
+        }
+    }
+
+    // 1 = (k,0,m), 2 = (k,0,-m)
+    for (m = 1; m <= kzmax; m++) {
+        for (k = 1; k <= kxmax; k++) {
+            sqk = squnitk[0] * k * k + squnitk[2] * m * m;
+            if (sqk <= gsqmx) {
+                fcCache2[k][0][m] = std::exp(sqk * g_ewald_sq_inv) / sqk / 2;
+            }
+        }
+    }
+
+    // 1 = (k,l,m), 2 = (k,-l,m), 3 = (k,l,-m), 4 = (k,-l,-m)
+    for (m = 1; m <= kzmax; m++) {
+        for (k = 1; k <= kxmax; k++) {
+            for (l = 1; l <= kymax; l++) {
+                sqk = squnitk[0] * k * k + squnitk[1] * l * l + squnitk[2] * m * m;
+                if (sqk <= gsqmx) {
+                    fcCache2[k][l][m] = std::exp(sqk * g_ewald_sq_inv) / sqk;
+                }
+            }
         }
     }
 }
@@ -260,11 +302,28 @@ void Conp::calc_Matrix()
     rSlab.fill(0);
     rKspace.fill(0);
 
-    calc_rKspace();
-    calc_rReal();
-    calc_rSelf();
-    calc_rSlab();
+    itp::Timer timer;
 
+    timer.start();
+    calc_rKspace();
+    timer.stop();
+    fmt::print("calc_kspace: {} s\n", timer.span());
+
+    timer.start();
+    calc_rReal();
+    timer.stop();
+    fmt::print("calc_real: {} s\n", timer.span());
+
+    timer.start();
+    calc_rSelf();
+    timer.stop();
+    fmt::print("calc_self: {} s\n", timer.span());
+
+    timer.start();
+    calc_rSlab();
+    timer.stop();
+    fmt::print("calc_slab: {} s\n", timer.span());
+    
     rMatrix = rReal + rSlab + rSelf + rKspace;
 }
 
@@ -306,24 +365,53 @@ void Conp::get_EcpmMatrix()
     timer.start();
     load_cache();
     timer.stop();
-    fmt::print("load_cache: {} s\n\n", timer.span());
+    fmt::print("load_cache: {} s\n", timer.span());
 
+    readGro(fnm[0]);
     cutoff *= 10; // transfer nm to A;
-    
+    g_ewald_sq_inv = -1.0 / (g_ewald * g_ewald) / 4;
+    kmax = std::max({ kxmax, kymax, kzmax });
+    for (int i = 0; i < 3; i++) {
+        unitk[i] = 2.0 * itp::pi / box[i];
+        squnitk[i] = unitk[i] * unitk[i];
+    }
+    double gsqxmx = squnitk[0] * kxmax * kxmax;
+    double gsqymx = squnitk[1] * kymax * kymax;
+    double gsqzmx = squnitk[2] * kzmax * kzmax;
+    gsqmx = std::max({ gsqxmx, gsqymx, gsqzmx }) * 1.00001;
+
+    fcCache1.resize(kmax);
+    fcCache2.resize(kxmax + 1);
+    for (auto&& y : fcCache2) {
+        y.resize(kymax + 1);
+        for (auto&& z : y) {
+            z.resize(kzmax + 1, 0);
+        }
+    }
+    timer.start();
+    calcKspaceFcCache();
+    timer.stop();
+    fmt::print("calc kspace fc cache: {} s\n\n", timer.span());
+
     for (auto&& fileName : fnm) {
         readGro(fileName);
-
+        fmt::print("cache size: {}\n", cache.size());
         cacheHitTimes = 0;
         timer.start();
         calc_Matrix();
         timer.stop();
         fmt::print("[{}] *** calculate matrix spend time: {} s\n", fileName, timer.span());
         fmt::print("cache hit times: {}\n", cacheHitTimes);
-        fmt::print("cache hit rate: {:4.2f} %\n\n", double(cacheHitTimes) / (natoms * (natoms+1)) * 200);
+        fmt::print("cache hit rate: {:4.2f} %\n", double(cacheHitTimes) / (natoms * (natoms+1)) * 200);
 
-        if (calcInv)
+        if (calcInv) {
+            timer.start();
             rInvMatrix = rMatrix.matrix().inverse().array();
-
+            timer.stop();
+            fmt::print("calculate inv: {} s\n", timer.span());
+        }
+            
+        timer.start();
         if (binary) {
             saveToBinaryFile("rMatrix_" + fileName + ".bin", rMatrix);
             if (calcInv) saveToBinaryFile("rInvMatrix_" + fileName + ".bin", rInvMatrix);
@@ -331,6 +419,8 @@ void Conp::get_EcpmMatrix()
             saveToTextFile("rMatrix_" + fileName + ".dat", rMatrix, "{:15.8e} ");
             if (calcInv) saveToTextFile("rInvMatrix_" + fileName + ".dat", rInvMatrix, "{:15.8e} ");
         }
+        timer.stop();
+        fmt::print("save matrix spend time: {} s\n\n", timer.span());
     }
     timer.start();
     save_cache();

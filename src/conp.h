@@ -31,8 +31,8 @@ public:
     void get_getPotFile();
 
 public:
-    // void kspaceThreadFunc(int rank, int numProcess);
     void kspaceThreadFunc(int rank);
+    void calcKspaceFcCache();
 
     void saveToTextFile(std::string fnm, const Eigen::ArrayXXd& data, std::string fmt = "{:15.8e} ");
 
@@ -75,6 +75,9 @@ public:
     int cacheHitTimes = 0;
 
     static std::unordered_map<double, double> cache;
+    // Fourier coefficient of the Gaussian function used in the Ewald sum
+    std::vector<std::array<double, 3>> fcCache1;
+    std::vector<std::vector<std::vector<double>>> fcCache2;  
 };
 
 

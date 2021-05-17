@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-g++ calcMatrix.cpp src/conp.cpp -I include/ -o calcMatrix -O3 -std=c++17 -fopenmp -pthread -lstdc++fs
+g++ calcMatrix.cpp src/conp_expCache.cpp -I include/ -o calcMatrix -O3 -std=c++17 -fopenmp -pthread -lstdc++fs
 
