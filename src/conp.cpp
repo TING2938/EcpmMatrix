@@ -158,7 +158,7 @@ void Conp::kspaceThreadFunc(int rank)
             auto it = cache.find(hash);
             if (it != cache.end()) {
                 rKspace(ii, jj) = it->second;
-                cacheHit++;
+                cacheHitTimes++;
                 mut.unlock();
                 continue;
             }
@@ -298,7 +298,7 @@ void Conp::get_EcpmMatrix()
     fmt::print("kxmax: {}\n", kxmax);
     fmt::print("kymax: {}\n", kymax);
     fmt::print("kzmax: {}\n", kzmax);
-    fmt::print("3d(0) or 3dc(1): {}\n", b3dc);
+    fmt::print("b3dc: {}\n", b3dc);
     fmt::print("output binary file: {}\n", binary);
     fmt::print("number of thread: {}\n", nthread);
     fmt::print("cutoff: {}\n", cutoff);
@@ -314,13 +314,13 @@ void Conp::get_EcpmMatrix()
     for (auto&& fileName : fnm) {
         readGro(fileName);
 
-        cacheHit = 0;
+        cacheHitTimes = 0;
         timer.start();
         calc_Matrix();
         timer.stop();
         fmt::print("{} *** calculate matrix spend time: {} s\n", fileName, timer.span());
-        fmt::print("cache hit count: {}\n", cacheHit);
-        fmt::print("cache hit rate: {:4.2f} %\n\n", double(cacheHit) / (natoms * (natoms+1)) * 200);
+        fmt::print("cache hit times: {}\n", cacheHitTimes);
+        fmt::print("cache hit rate: {:4.2f} %\n\n", double(cacheHitTimes) / (natoms * (natoms+1)) * 200);
 
         if (calcInv)
             rInvMatrix = rMatrix.matrix().inverse().array();

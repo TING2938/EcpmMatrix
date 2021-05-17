@@ -72,7 +72,7 @@ public:
     double gsqmx;
     double g_ewald_sq_inv;
     std::mutex mut;
-    int cacheHit = 0;
+    int cacheHitTimes = 0;
 
     static std::unordered_map<double, double> cache;
 };
