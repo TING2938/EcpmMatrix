@@ -474,6 +474,96 @@ void Conp::get_getPotFile()
     }
 }
 
+void Conp::get_CpmControlFile()
+{
+    int NelectrodeAtom = 10800;
+    int NelectrodeAtomOuter = 2700;
+    int NelectrodeAtomInner = 2700;
+    int CalcQfreq = 1;
+    int OutQfreq = 2000;
+
+    itp::Getopt getopt(argc, argv);
+    getopt(NelectrodeAtom, "-n", true, "number of total electrode atoms");
+    getopt(NelectrodeAtom, "-outer", true, "number of outer electrode atoms");
+    getopt(NelectrodeAtom, "-inner", true, "number of inner electrode atoms");
+    getopt(CalcQfreq, "-calcQ", false, "CalcQ freq");
+    getopt(OutQfreq, "-outQ", false, "OutQ freq");
+    getopt.finish();
+
+    std::ofstream ofile("CPM_control.dat");
+    fmt::print(ofile, "NelectrodeAtom  {}\n", NelectrodeAtom);
+    fmt::print(ofile, "NelectrodeAtomOuter  {}\n", NelectrodeAtomOuter);
+    fmt::print(ofile, "NelectrodeAtomInner  {}\n", NelectrodeAtomInner);
+    fmt::print(ofile, "CalcQfreq  {}\n", CalcQfreq);
+    fmt::print(ofile, "OutQfreq   {}\n", OutQfreq);
+    ofile.close();
+}
+
+void Conp::cvtBinaryToTextFile()
+{
+    std::string inputFileName = "rMatrix.bin";
+    std::string outputFileName = "rMatrix.dat";
+    itp::Getopt getopt(argc, argv);
+    getopt(inputFileName, "-f", true, "input binary file name");
+    getopt(outputFileName, "-o", true, "output text file name");
+    getopt.finish();
+
+    std::ifstream inputFile(inputFileName, std::ios::binary);
+    auto begin = inputFile.tellg();
+    inputFile.seekg(std::ios::end);
+    auto length = (inputFile.tellg() - begin) / sizeof(float);
+    inputFile.seekg(std::ios::beg);
+    std::vector<float> data(length);
+    inputFile.read((char*)(data.data()), length * sizeof(float));
+    inputFile.close();
+
+    int column = std::sqrt(length);
+    fmt::print("column: {}\n", column);
+    std::ofstream outputFile(outputFileName);
+    for (int i = 0; i < column; i++) {
+        for (int j = 0; j < column; j++) {
+            fmt::print(outputFile, "{:15.8e} ", data[i * column + j]);
+        }
+        fmt::print(outputFile, "\n");
+    }
+    outputFile.close();
+}
+
+void Conp::cvtTextToBinaryFile()
+{
+    std::string inputFileName = "rMatrix.dat";
+    std::string outputFileName = "rMatrix.bin";
+    itp::Getopt getopt(argc, argv);
+    getopt(inputFileName, "-f", true, "input text file name");
+    getopt(outputFileName, "-o", true, "output binary file name");
+    getopt.finish();
+
+    std::string line;
+    int column = 0;
+    float tmp;
+    std::ifstream inputFile(inputFileName);
+    std::getline(inputFile, line);
+    std::stringstream ss;
+    ss.str(line);
+    while (ss >> tmp) {
+        column++;
+    }
+    ss.clear();
+    std::vector<float> data(column * column);
+    int ndx = 0;
+    do 	{
+        ss.str(line);
+        for (int i = 0; i < column; i++) {
+            ss >> data[ndx++];
+        }
+        ss.clear();
+    } while (std::getline(inputFile, line));
+
+    std::ofstream outputFile(outputFileName, std::ios::binary);
+    outputFile.write((char*)(data.data()), sizeof(float) * column * column);
+    outputFile.close();
+}
+
 void Conp::saveToTextFile(std::string fnm, const Eigen::ArrayXXd& data, std::string fmt)
 {
     std::ofstream ofile(fnm);

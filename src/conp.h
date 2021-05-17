@@ -30,8 +30,15 @@ public:
 
     void get_getPotFile();
 
+    void get_CpmControlFile();
+
+    void cvtBinaryToTextFile();
+
+    void cvtTextToBinaryFile();
+
 public:
     void kspaceThreadFunc(int rank);
+
     void calcKspaceFcCache();
 
     void saveToTextFile(std::string fnm, const Eigen::ArrayXXd& data, std::string fmt = "{:15.8e} ");
