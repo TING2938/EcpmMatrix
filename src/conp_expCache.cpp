@@ -403,7 +403,6 @@ void Conp::get_EcpmMatrix()
         
         progressBar.ncols = 30;
         progressBar.totalNum = natoms * (natoms + 1) / 2;
-        progressBar.finishedNum = 0;
         progressBar.start();
         
         timer.start();

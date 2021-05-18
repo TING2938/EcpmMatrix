@@ -109,9 +109,6 @@ namespace itp
         // 总数
         unsigned int totalNum = 0;
 
-        // 已完成的数量
-        std::atomic<unsigned int> finishedNum = 0;
-
         // 重绘周期
         std::chrono::milliseconds interval = std::chrono::seconds(1);
 
@@ -122,6 +119,9 @@ namespace itp
         // 上次的已完成数量
         unsigned int lastNum = 0;
         
+        // 已完成的数量
+        std::atomic<unsigned int> finishedNum = 0;
+
         // 开始时间
         std::chrono::steady_clock::time_point beginTime;
 
@@ -140,6 +140,8 @@ namespace itp
         void start()
         {
             // 记录开始时间，并初始化定时器
+            this->finishedNum = 0;
+            this->lastNum = 0;
             this->beginTime = std::chrono::steady_clock::now();
             this->lastTime = this->beginTime;
             // 定时器用于定时调用重绘函数
@@ -207,7 +209,7 @@ namespace itp
                 timeLast = 0;
             }
             std::time_t tl = timeLast;
-            std::cerr << std::put_time(gmtime(&tl), "%X") << ' ';
+            std::cerr << std::put_time(gmtime(&tl), "%X") << "     ";
             this->lastNum = tmpFinished;
             this->lastTime = now;
         }
