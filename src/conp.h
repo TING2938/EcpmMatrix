@@ -3,6 +3,7 @@
 
 #include <itp/core>
 #include <itp/getopt>
+#include <itp/progressbar>
 #include <thread>
 #include <mutex>
 #include <unordered_map>
@@ -51,8 +52,6 @@ public:
 
     void save_cache();
 
-    void printProgressInfo();
-
 public:
     int argc;
     char** argv;
@@ -82,7 +81,7 @@ public:
     double g_ewald_sq_inv;
     std::mutex mut;
     int cacheHitTimes = 0;
-    size_t progressCount;
+    itp::ProgressBar progressBar;
 
     static std::unordered_map<double, double> cache;
     // Fourier coefficient of the Gaussian function used in the Ewald sum

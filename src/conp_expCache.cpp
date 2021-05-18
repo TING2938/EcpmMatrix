@@ -139,7 +139,7 @@ void Conp::kspaceThreadFunc(int rank)
             if (it != cache.end()) {
                 rKspace(ii, jj) = it->second;
                 cacheHitTimes++;
-                progressCount++;
+                progressBar.update();
                 mut.unlock();
                 continue;
             }
@@ -217,7 +217,7 @@ void Conp::kspaceThreadFunc(int rank)
             }
             mut.lock();
             cache[hash] = rKspace(ii, jj);
-            progressCount++;
+            progressBar.update();
             mut.unlock();
         }
     }
@@ -309,6 +309,7 @@ void Conp::calc_Matrix()
     timer.start();
     calc_rKspace();
     timer.stop();
+    progressBar.finish();
     fmt::print("calc_kspace: {} s\n", timer.span());
 
     timer.start();
@@ -399,13 +400,16 @@ void Conp::get_EcpmMatrix()
         readGro(fileName);
         fmt::print("cache size: {}\n", cache.size());
         cacheHitTimes = 0;
-        progressCount = 1;
-        // print remained time info:
-        std::thread(&Conp::printProgressInfo, this).detach();
-
+        
+        progressBar.ncols = 25;
+        progressBar.totalNum = natoms * (natoms + 1) / 2;
+        progressBar.finishedNum = 0;
+        progressBar.start();
+        
         timer.start();
         calc_Matrix();
         timer.stop();
+
         fmt::print("[{}] *** calculate matrix spend time: {} s\n", fileName, timer.span());
         fmt::print("cache hit times: {}\n", cacheHitTimes);
         fmt::print("cache hit rate: {:4.2f} %\n", double(cacheHitTimes) / (natoms * (natoms + 1)) * 200);
@@ -523,7 +527,7 @@ void Conp::cvtBinaryToTextFile()
     inputFile.read((char*)(data.data()), length * sizeof(float));
     inputFile.close();
 
-    int column = std::sqrt(length);
+    int column = int(std::sqrt(length));
     fmt::print("column: {}\n", column);
     std::ofstream outputFile(outputFileName);
     for (int i = 0; i < column; i++) {
@@ -616,37 +620,10 @@ void Conp::save_cache()
         std::filesystem::create_directory("EcpmMatrixCache");
     }
     std::ofstream ofile("EcpmMatrixCache/kspaceCache.bin", std::ios::binary);
-    int length = cache.size();
+    int length = int(cache.size());
     ofile.write((char*)(&length), sizeof(int));
     for (auto it = cache.begin(); it != cache.end(); it++) {
         ofile.write((char*)(&(*it)), sizeof(double) * 2);
     }
 }
 
-void Conp::printProgressInfo()
-{
-    auto beginTime = std::chrono::system_clock::now();
-    int ncount = (natoms * (natoms + 1)) / 2;
-    while (true) {
-        auto endTime = beginTime + (std::chrono::system_clock::now() - beginTime) * ncount / progressCount;
-        auto t_c = std::chrono::system_clock::to_time_t(endTime);
-
-        auto remain = std::chrono::duration_cast<std::chrono::seconds>(endTime - std::chrono::system_clock::now());
-
-        itp::setScrollOutput();
-        if (remain.count() <= 240) {
-            std::cout << "Progress: {:.2f}%, "_format(100.0 * progressCount / ncount)
-                << "remaining wall clock time: " << remain.count() << " s" << std::string(20, ' ');
-        } else {
-            std::cout << "Progress: {:.2f}%, "_format(100.0 * progressCount / ncount)
-                << "will finish at " << std::put_time(std::localtime(&t_c), "%F %T");
-        }
-
-        if (progressCount >= ncount) {
-            fmt::print("\nFinished!\n");
-            break;
-        }
-
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-}
