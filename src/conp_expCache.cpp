@@ -401,7 +401,7 @@ void Conp::get_EcpmMatrix()
         fmt::print("cache size: {}\n", cache.size());
         cacheHitTimes = 0;
         
-        progressBar.ncols = 25;
+        progressBar.ncols = 30;
         progressBar.totalNum = natoms * (natoms + 1) / 2;
         progressBar.finishedNum = 0;
         progressBar.start();

@@ -207,7 +207,7 @@ namespace itp
                 timeLast = 0;
             }
             std::time_t tl = timeLast;
-            std::cerr << std::put_time(gmtime(&tl), "%X");
+            std::cerr << std::put_time(gmtime(&tl), "%X") << ' ';
             this->lastNum = tmpFinished;
             this->lastTime = now;
         }
