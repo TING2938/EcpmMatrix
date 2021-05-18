@@ -194,7 +194,7 @@ namespace itp
             std::cerr << std::setw(barWidth) << std::setfill(sign) << sign;
             std::cerr << std::setw(this->ncols - barWidth) << std::setfill(' ') << "|";
             // 打印速度
-            std::cerr << std::setprecision(1) << std::fixed << rate << " p/s|";
+            std::cerr << std::setprecision(1) << std::fixed << rate << "P/s|";
             // 之后的两部分内容分别为打印已过的时间和剩余时间
             std::time_t tfs = std::time_t(std::chrono::duration<double>(timeFromStart).count());
             std::cerr << std::put_time(gmtime(&tfs), "%X") << "|";
