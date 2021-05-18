@@ -194,11 +194,8 @@ namespace itp
             // 打印速度
             std::cerr << std::setprecision(1) << std::fixed << rate << " p/s|";
             // 之后的两部分内容分别为打印已过的时间和剩余时间
-            int timeFromStartCount = int(std::chrono::duration<double>(timeFromStart).count());
-            std::time_t tfs = timeFromStartCount;
-            tm tmfs;
-            gmtime_s(&tmfs, &tfs);
-            std::cerr << std::put_time(&tmfs, "%X") << "|";
+            std::time_t tfs = std::time_t(std::chrono::duration<double>(timeFromStart).count());
+            std::cerr << std::put_time(gmtime(&tfs), "%X") << "|";
             int timeLast;
             if (rate != 0) {
                 // 剩余时间的估计是用这次的速度和未完成的数量进行估计
@@ -210,9 +207,7 @@ namespace itp
                 timeLast = 0;
             }
             std::time_t tl = timeLast;
-            tm tml;
-            gmtime_s(&tml, &tl);
-            std::cerr << std::put_time(&tml, "%X");
+            std::cerr << std::put_time(gmtime(&tl), "%X");
             this->lastNum = tmpFinished;
             this->lastTime = now;
         }
