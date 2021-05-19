@@ -82,6 +82,7 @@ public:
     std::mutex mut;
     int cacheHitTimes = 0;
     itp::ProgressBar progressBar;
+    int progressBarStyle = 1;
 
     static std::unordered_map<double, double> cache;
     // Fourier coefficient of the Gaussian function used in the Ewald sum

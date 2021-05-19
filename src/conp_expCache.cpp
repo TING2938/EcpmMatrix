@@ -350,6 +350,7 @@ void Conp::get_EcpmMatrix()
     getopt(calcInv, "-calcInv", false, "calc inverse ?");
     getopt(eta, "-eta", false, "eta");
     getopt(g_ewald, "-ewald", false, "g_ewald");
+    getopt(progressBarStyle, "-style", false, "progress bar style");
     getopt.finish();
 
     // print input args
@@ -403,6 +404,7 @@ void Conp::get_EcpmMatrix()
         
         progressBar.ncols = 30;
         progressBar.totalNum = natoms * (natoms + 1) / 2;
+        progressBar.style = progressBarStyle;
         progressBar.start();
         
         timer.start();
