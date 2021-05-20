@@ -72,7 +72,7 @@ public:
     bool calcInv = true;
 
     Eigen::ArrayX3d x;
-    Eigen::ArrayXXd rReal, rSelf, rSlab, rKspace, rMatrix, rInvMatrix;
+    Eigen::ArrayXXd rMatrix, rInvMatrix;
     std::vector<std::thread> thread;
 
     double unitk[3], squnitk[3];
@@ -82,6 +82,7 @@ public:
     std::mutex mut;
     int cacheHitTimes = 0;
     itp::ProgressBar progressBar;
+    bool showProgressBar = true;
     int progressBarStyle = 1;
 
     static std::unordered_map<double, double> cache;

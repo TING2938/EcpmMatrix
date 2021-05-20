@@ -77,7 +77,7 @@ void Conp::calc_rReal()
                 std::pow(x(i, 2) - xall(j, 2), 2);
             if ((r < cutoff * cutoff) && r > 1e-7) {
                 r = std::sqrt(r);
-                rReal(i, j % natoms) = (fast_erfc(g_ewald * r) - fast_erfc(eta * r / sqrt(2))) / r;
+                rMatrix(i, j % natoms) += (fast_erfc(g_ewald * r) - fast_erfc(eta * r / sqrt(2))) / r;
             }
         }
     }
@@ -86,7 +86,7 @@ void Conp::calc_rReal()
 void Conp::calc_rSelf()
 {
     for (int i = 0; i != natoms; ++i) {
-        rSelf(i, i) = (std::sqrt(2) * eta - 2 * g_ewald) / std::sqrt(itp::pi);
+        rMatrix(i, i) += (std::sqrt(2) * eta - 2 * g_ewald) / std::sqrt(itp::pi);
     }
 }
 
@@ -96,7 +96,7 @@ void Conp::calc_rSlab()
         for (int j = 0; j != natoms; ++j) {
             if (b3dc) {
                 //if system is not slab, no need to add slab correction.
-                rSlab(i, j) = 4 * itp::pi * x(i, 2) * x(j, 2) / volume;
+                rMatrix(i, j) += 4 * itp::pi * x(i, 2) * x(j, 2) / volume;
             }
         }
     }
@@ -113,10 +113,10 @@ void Conp::calc_rKspace()
     }
     for (int ii = 0; ii < natoms; ii++) {
         for (int jj = 0; jj < ii; jj++) {
-            rKspace(jj, ii) = rKspace(ii, jj);
+            rMatrix(jj, ii) = rMatrix(ii, jj);
         }
     }
-    rKspace *= (32.0 * itp::pi / volume);
+    rMatrix *= (32.0 * itp::pi / volume);
 }
 
 void Conp::kspaceThreadFunc(int rank)
@@ -137,9 +137,9 @@ void Conp::kspaceThreadFunc(int rank)
             mut.lock();
             auto it = cache.find(hash);
             if (it != cache.end()) {
-                rKspace(ii, jj) = it->second;
+                rMatrix(ii, jj) = it->second;
                 cacheHitTimes++;
-                progressBar.update();
+                if (showProgressBar) progressBar.update();
                 mut.unlock();
                 continue;
             }
@@ -149,18 +149,18 @@ void Conp::kspaceThreadFunc(int rank)
             for (m = 1; m <= kmax; m++) {
                 sqk = m * m * squnitk[0];
                 if (sqk <= gsqmx) {
-                    rKspace(ii, jj) += fcCache1[m - 1][0] * fast_cos(m * unitk[0] * dx[0]);
+                    rMatrix(ii, jj) += fcCache1[m - 1][0] * fast_cos(m * unitk[0] * dx[0]);
                 }
 
                 sqk = m * m * squnitk[1];
                 if (sqk <= gsqmx) {
-                    rKspace(ii, jj) += fcCache1[m - 1][1] * fast_cos(m * unitk[1] * dx[1]);
+                    rMatrix(ii, jj) += fcCache1[m - 1][1] * fast_cos(m * unitk[1] * dx[1]);
                 }
 
                 sqk = m * m * squnitk[2];
                 if (sqk <= gsqmx) {
                     fc = std::exp(sqk * g_ewald_sq_inv) / sqk;
-                    rKspace(ii, jj) += fcCache1[m - 1][2] * fast_cos(m * unitk[2] * dx[2]);
+                    rMatrix(ii, jj) += fcCache1[m - 1][2] * fast_cos(m * unitk[2] * dx[2]);
                 }
             }
 
@@ -170,7 +170,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (l = 1; l <= kymax; l++) {
                     sqk = squnitk[0] * k * k + squnitk[1] * l * l;
                     if (sqk <= gsqmx) {
-                        rKspace(ii, jj) += fcCache2[k][l][0] *
+                        rMatrix(ii, jj) += fcCache2[k][l][0] *
                             fast_cos(k * unitk[0] * dx[0]) *
                             fast_cos(l * unitk[1] * dx[1]);
                     }
@@ -182,7 +182,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (l = 1; l <= kymax; l++) {
                     sqk = squnitk[1] * l * l + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
-                        rKspace(ii, jj) += fcCache2[0][l][m] *
+                        rMatrix(ii, jj) += fcCache2[0][l][m] *
                             fast_cos(l * unitk[1] * dx[1]) *
                             fast_cos(m * unitk[2] * dx[2]);
                     }
@@ -194,7 +194,7 @@ void Conp::kspaceThreadFunc(int rank)
                 for (k = 1; k <= kxmax; k++) {
                     sqk = squnitk[0] * k * k + squnitk[2] * m * m;
                     if (sqk <= gsqmx) {
-                        rKspace(ii, jj) += fcCache2[k][0][m] *
+                        rMatrix(ii, jj) += fcCache2[k][0][m] *
                             fast_cos(k * unitk[0] * dx[0]) *
                             fast_cos(m * unitk[2] * dx[2]);
                     }
@@ -207,7 +207,7 @@ void Conp::kspaceThreadFunc(int rank)
                     for (l = 1; l <= kymax; l++) {
                         sqk = squnitk[0] * k * k + squnitk[1] * l * l + squnitk[2] * m * m;
                         if (sqk <= gsqmx) {
-                            rKspace(ii, jj) += fcCache2[k][l][m] *
+                            rMatrix(ii, jj) += fcCache2[k][l][m] *
                                 fast_cos(k * unitk[0] * dx[0]) *
                                 fast_cos(l * unitk[1] * dx[1]) *
                                 fast_cos(m * unitk[2] * dx[2]);
@@ -216,8 +216,8 @@ void Conp::kspaceThreadFunc(int rank)
                 }
             }
             mut.lock();
-            cache[hash] = rKspace(ii, jj);
-            progressBar.update();
+            cache[hash] = rMatrix(ii, jj);
+            if (showProgressBar) progressBar.update();
             mut.unlock();
         }
     }
@@ -293,27 +293,20 @@ void Conp::calcKspaceFcCache()
 void Conp::calc_Matrix()
 {
     rMatrix.resize(natoms, natoms);
-    rReal.resize(natoms, natoms);
-    rSelf.resize(natoms, natoms);
-    rSlab.resize(natoms, natoms);
-    rKspace.resize(natoms, natoms);
-
     rMatrix.fill(0);
-    rReal.fill(0);
-    rSelf.fill(0);
-    rSlab.fill(0);
-    rKspace.fill(0);
 
     itp::Timer timer;
 
-    progressBar.ncols = 30;
-    progressBar.totalNum = natoms * (natoms + 1) / 2;
-    progressBar.style = progressBarStyle;
-    progressBar.start();
+    if (showProgressBar) {
+        progressBar.ncols = 30;
+        progressBar.totalNum = natoms * (natoms + 1) / 2;
+        progressBar.style = progressBarStyle;
+        progressBar.start();
+    }
     timer.start();
     calc_rKspace();
     timer.stop();
-    progressBar.finish();
+    if (showProgressBar) progressBar.finish();
     fmt::print("calc_kspace: {} s\n", timer.span());
 
     timer.start();
@@ -331,7 +324,6 @@ void Conp::calc_Matrix()
     timer.stop();
     fmt::print("calc_slab: {} s\n", timer.span());
 
-    rMatrix = rReal + rSlab + rSelf + rKspace;
 }
 
 void Conp::get_EcpmMatrix()
@@ -355,6 +347,7 @@ void Conp::get_EcpmMatrix()
     getopt(eta, "-eta", false, "eta");
     getopt(g_ewald, "-ewald", false, "g_ewald");
     getopt(progressBarStyle, "-style", false, "progress bar style");
+    getopt(showProgressBar, "-showProgressBar", false, "show progress bar ?");
     getopt.finish();
 
     // print input args
