@@ -187,14 +187,12 @@ namespace itp
         /**
          * @brief 添加子程序
          * @tparam Func 子程序执行的函数类型
-         * @tparam ...Valty 子程序执行函数的输入参数类型
          * @param str 命令行参数指示字符串
          * @param msg 子程序说明
          * @param func 子程序执行的函数
-         * @param ...val 子程序执行函数的输入参数
         */
         template <typename Func, typename... Valty>
-        void addSubProgram(std::string str, std::string msg, Func func, Valty&&... val)
+        void addSubProgram(std::string str, std::string msg, Func&& func)
         {
             if (_printHelpMain) {
                 std::stringstream ss;
@@ -205,7 +203,7 @@ namespace itp
             }
 
             if (str == argv[1]) {
-                func(std::forward<Valty>(val)...);
+                func();
             }
         }
 

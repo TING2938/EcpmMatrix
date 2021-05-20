@@ -1,107 +1,15 @@
-/**
- * class ProgressBar  : https://www.jb51.net/article/184426.htm
- * class inner::Timer : https://www.jb51.net/article/184416.htm
- * 
- */
 #ifndef __PROGRESS_BAR_HPP__
 #define __PROGRESS_BAR_HPP__
 
 #include <ctime>
 #include <chrono>
-#include <iostream>
-#include <iomanip>
-#include <functional>
-#include <thread>
 #include <atomic>
-#include <memory>
-#include <mutex>
-#include <condition_variable>
 
-#include <itp/color>
+#include "core_timer.hpp"
+#include "core_color.hpp"
 
 namespace itp
 {
-    namespace inner
-    {
-        using namespace std::chrono;
-        class Timer
-        {
-        public:
-            Timer() : _expired(true), _try_to_expire(false)
-            {}
-
-            Timer(const Timer& timer)
-            {
-                _expired = timer._expired.load();
-                _try_to_expire = timer._try_to_expire.load();
-            }
-
-            ~Timer()
-            {
-                stop();
-            }
-
-            void start(int interval, std::function<void()> task)
-            {
-                // is started, do not start again
-                if (_expired == false)
-                    return;
-
-                // start async timer, launch thread and wait in that thread
-                _expired = false;
-                std::thread([this, interval, task]() {
-                    while (!_try_to_expire) {
-                        // sleep every interval and do the task again and again until times up
-                        std::this_thread::sleep_for(std::chrono::milliseconds(interval));
-                        task();
-                    }
-
-                    {
-                        // timer be stopped, update the condition variable expired and wake main thread
-                        std::lock_guard<std::mutex> locker(_mutex);
-                        _expired = true;
-                        _expired_cond.notify_one();
-                    }
-                    }).detach();
-            }
-
-            void startOnce(int delay, std::function<void()> task)
-            {
-                std::thread([delay, task]() {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-                    task();
-                    }).detach();
-            }
-
-            void stop()
-            {
-                // do not stop again
-                if (_expired)
-                    return;
-
-                if (_try_to_expire)
-                    return;
-
-                // wait until timer 
-                _try_to_expire = true; // change this bool value to make timer while loop stop
-                {
-                    std::unique_lock<std::mutex> locker(_mutex);
-                    _expired_cond.wait(locker, [this] {return _expired == true; });
-
-                    // reset the timer
-                    if (_expired == true)
-                        _try_to_expire = false;
-                }
-            }
-
-        private:
-            std::atomic<bool> _expired; // timer stopped status
-            std::atomic<bool> _try_to_expire; // timer is in stop process
-            std::mutex _mutex;
-            std::condition_variable _expired_cond;
-        };
-    }
-
     class ProgressBar
     {
     public:
@@ -111,7 +19,7 @@ namespace itp
         // 总数
         unsigned int totalNum = 0;
 
-        // 重绘周期
+        // 重绘周期，毫秒
         std::chrono::milliseconds interval = std::chrono::seconds(1);
 
         // 填充标志
@@ -123,7 +31,7 @@ namespace itp
     protected:
         // 上次的已完成数量
         unsigned int lastNum = 0;
-        
+
         // 已完成的数量
         std::atomic<unsigned int> finishedNum = 0;
 
@@ -132,14 +40,15 @@ namespace itp
 
         // 上次重绘的时间
         std::chrono::steady_clock::time_point lastTime;
-        
-        inner::Timer timer;
+
+        itp::TimingActuator timingActuator;
 
     public:
         ProgressBar() = default;
 
-        ProgressBar(unsigned int totalNum, std::chrono::milliseconds interval = std::chrono::seconds(1)) : 
-            totalNum(totalNum), interval(interval) {}
+        ProgressBar(unsigned int totalNum, std::chrono::milliseconds interval = std::chrono::seconds(1)) :
+            totalNum(totalNum), interval(interval)
+        {}
 
         // 开始
         void start()
@@ -150,21 +59,21 @@ namespace itp
             this->beginTime = std::chrono::steady_clock::now();
             this->lastTime = this->beginTime;
             // 定时器用于定时调用重绘函数
-            this->timer.start(int(this->interval.count()), std::bind(&ProgressBar::show, this));
+            this->timingActuator.setInterval(int(this->interval.count()), std::bind(&ProgressBar::show, this));
         }
 
         // 完成
         void finish()
         {
             // 停止定时器
-            this->timer.stop();
-            std::cerr << color::showCursor << std::endl;
+            this->timingActuator.stop();
+            std::fprintf(stderr, "%s\n", color::showCursor);
         }
 
         // 更新
-        void update() 
-        { 
-            return this->update(1); 
+        void update()
+        {
+            return this->update(1);
         }
 
         // 一次更新多个数量
@@ -173,6 +82,7 @@ namespace itp
             this->finishedNum += num;
         }
 
+    private:
         // 重绘
         void show()
         {
@@ -200,7 +110,7 @@ namespace itp
             this->lastNum = tmpFinished;
             this->lastTime = now;
 
-            switch (style) 	{
+            switch (style) {
             case 1:
                 style1(present, rate, tmpFinished, timeFromStart);
                 break;
@@ -210,10 +120,9 @@ namespace itp
             default:
                 break;
             }
-            
+
         }
 
-    public:
         void style1(double present, double rate, unsigned int tmpFinished, const std::chrono::nanoseconds& timeFromStart)
         {
             std::fprintf(stderr, "%s", color::green);
@@ -223,7 +132,7 @@ namespace itp
             int barWidth = int(present * this->ncols / 100.0);
             // 打印已完成和未完成进度条、速度
             for (int i = 0; i < barWidth; i++) std::fprintf(stderr, "%c", sign);
-            std::fprintf(stderr, "%-*c|%.1fMHz|", this->ncols - barWidth, '>', rate/1000);
+            std::fprintf(stderr, "%-*c|%.1fMHz|", this->ncols - barWidth, '>', rate / 1000);
 
             // 之后的两部分内容分别为打印已过的时间和剩余时间
             std::time_t tfs;
