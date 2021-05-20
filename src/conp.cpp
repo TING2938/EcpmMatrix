@@ -347,7 +347,7 @@ void Conp::get_EcpmMatrix()
     getopt(eta, "-eta", false, "eta");
     getopt(g_ewald, "-ewald", false, "g_ewald");
     getopt(progressBarStyle, "-style", false, "progress bar style");
-    getopt(showProgressBar, "-showProgressBar", false, "show progress bar ?");
+    getopt(showProgressBar, "-showBar", false, "show progress bar ?");
     getopt.finish();
 
     // print input args
@@ -362,13 +362,13 @@ void Conp::get_EcpmMatrix()
     fmt::print("number of thread: {}\n", nthread);
     fmt::print("cutoff: {}\n", cutoff);
 
+    readGro(fnm[0]);
     itp::Timer timer;
     timer.start();
     load_cache();
     timer.stop();
     fmt::print("load_cache: {} s\n", timer.span());
 
-    readGro(fnm[0]);
     cutoff *= 10; // transfer nm to A;
     g_ewald_sq_inv = -1.0 / (g_ewald * g_ewald) / 4;
     kmax = std::max({ kxmax, kymax, kzmax });
@@ -594,7 +594,7 @@ double Conp::calc_hash(double dx[3])
 
 void Conp::load_cache()
 {
-    std::ifstream ifile("EcpmMatrixCache/kspaceCache.bin", std::ios::binary);
+    std::ifstream ifile("EcpmMatrixCache/kspaceCache_{:.3f}.bin"_format(calc_hash(box)), std::ios::binary);
     if (ifile) {
         fmt::print("Success of load cache file.\n");
         int length = 0;
@@ -612,7 +612,7 @@ void Conp::save_cache()
     if (!std::filesystem::is_directory("EcpmMatrixCache")) {
         std::filesystem::create_directory("EcpmMatrixCache");
     }
-    std::ofstream ofile("EcpmMatrixCache/kspaceCache.bin", std::ios::binary);
+    std::ofstream ofile("EcpmMatrixCache/kspaceCache_{:.3f}.bin"_format(calc_hash(box)), std::ios::binary);
     int length = int(cache.size());
     ofile.write((char*)(&length), sizeof(int));
     for (auto it = cache.begin(); it != cache.end(); it++) {
