@@ -11,7 +11,6 @@
 
 namespace itp
 {
-	// è®¡æ—¶å™¨ç±»
 	class Timer
 	{
 	public:
@@ -21,43 +20,43 @@ namespace itp
 		using seconds = std::chrono::duration<double>;                  // s
 		using minutes = std::chrono::duration<double, std::ratio<60>>;  // min
 		using hours = std::chrono::duration<double, std::ratio<3600>>;  // h
-		
+
 	private:
 		std::chrono::steady_clock::time_point _begin, _end;
-		
+
 	public:
 		Timer() : _begin(std::chrono::steady_clock::time_point()),
-			_end(std::chrono::steady_clock::time_point()) { }
+			_end(std::chrono::steady_clock::time_point())
+		{}
 
-		// å¼€å§‹è®¡æ—¶
-		
+
 		void start()
 		{
 			_begin = std::chrono::steady_clock::now();
 		}
 
-		// ç»“æŸè®¡æ—¶
+		// ½áÊø¼ÆÊ±
 		void stop()
 		{
 			_end = std::chrono::steady_clock::now();
 		}
 
-		// @brief è®¡æ—¶è·¨åº¦
-		// @return ä»å¼€å§‹åˆ°ç»“æŸæ‰€ç”¨æ—¶é—´ï¼ˆé»˜è®¤ï¼šç§’ï¼‰
+		// @brief ¼ÆÊ±¿ç¶È
+		// @return ´Ó¿ªÊ¼µ½½áÊøËùÓÃÊ±¼ä£¨Ä¬ÈÏ£ºÃë£©
 		template <typename Duration = seconds>
 		double span()
 		{
 			return std::chrono::duration_cast<Duration>(_end - _begin).count();
 		}
 
-		// @brief æ‰“å°å‡ºè®¡æ—¶è·¨åº¦ï¼ˆé»˜è®¤ï¼šç§’ï¼‰
+		// @brief ´òÓ¡³ö¼ÆÊ±¿ç¶È£¨Ä¬ÈÏ£ºÃë£©
 		template <typename Duration = seconds>
 		void printSpan(const std::string& front = "", const std::string& back = "")
 		{
-			std::cout 
-				<< front 
-				<< std::chrono::duration_cast<Duration>(_end - _begin).count() 
-				<< back 
+			std::cout
+				<< front
+				<< std::chrono::duration_cast<Duration>(_end - _begin).count()
+				<< back
 				<< '\n';
 		}
 
@@ -70,9 +69,9 @@ namespace itp
 	public:
 
 		/**
-		 * @brief 
-		 * @tparam _Fn 
-		 * @tparam ..._Arg 
+		 * @brief
+		 * @tparam _Fn
+		 * @tparam ..._Arg
 		 * @param delay ms
 		 * @param func function
 		*/
@@ -90,9 +89,9 @@ namespace itp
 		}
 
 		/**
-		 * @brief 
-		 * @tparam _Fn 
-		 * @tparam ..._Arg 
+		 * @brief
+		 * @tparam _Fn
+		 * @tparam ..._Arg
 		 * @param interval ms
 		 * @param func  function
 		*/

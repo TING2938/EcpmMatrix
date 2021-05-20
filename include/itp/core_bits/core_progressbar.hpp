@@ -67,6 +67,7 @@ namespace itp
         {
             // 停止定时器
             this->timingActuator.stop();
+            this->show();
             std::fprintf(stderr, "%s\n", color::showCursor);
         }
 

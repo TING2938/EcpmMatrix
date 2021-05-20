@@ -306,6 +306,10 @@ void Conp::calc_Matrix()
 
     itp::Timer timer;
 
+    progressBar.ncols = 30;
+    progressBar.totalNum = natoms * (natoms + 1) / 2;
+    progressBar.style = progressBarStyle;
+    progressBar.start();
     timer.start();
     calc_rKspace();
     timer.stop();
@@ -401,12 +405,7 @@ void Conp::get_EcpmMatrix()
         readGro(fileName);
         fmt::print("cache size: {}\n", cache.size());
         cacheHitTimes = 0;
-        
-        progressBar.ncols = 30;
-        progressBar.totalNum = natoms * (natoms + 1) / 2;
-        progressBar.style = progressBarStyle;
-        progressBar.start();
-        
+
         timer.start();
         calc_Matrix();
         timer.stop();
