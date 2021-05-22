@@ -4,6 +4,10 @@
 #include <ctime>
 #include <chrono>
 #include <atomic>
+#include <fmt/format.h>
+#include <functional>
+#include <string>
+using namespace std::literals;
 
 #include "core_timer.hpp"
 #include "core_color.hpp"
@@ -41,7 +45,7 @@ namespace itp
         // 上次重绘的时间
         std::chrono::steady_clock::time_point lastTime;
 
-        itp::TimingActuator timingActuator;
+        itp::Timer timingActuator;
 
     public:
         ProgressBar() = default;
@@ -126,21 +130,13 @@ namespace itp
 
         void style1(double present, double rate, unsigned int tmpFinished, const std::chrono::nanoseconds& timeFromStart)
         {
-            std::fprintf(stderr, "%s", color::green);
-            // 打印百分数
-            std::fprintf(stderr, "%.1f%%|", present);
-            // 计算应该绘制多少`sign`符号
             int barWidth = int(present * this->ncols / 100.0);
-            // 打印已完成和未完成进度条、速度
-            for (int i = 0; i < barWidth; i++) std::fprintf(stderr, "%c", sign);
-            std::fprintf(stderr, "%-*c|%.1fMHz|", this->ncols - barWidth, '>', rate / 1000);
 
             // 之后的两部分内容分别为打印已过的时间和剩余时间
             std::time_t tfs;
-            char mbstr[100];
+            char mbstr1[100], mbstr2[100];
             tfs = std::time_t(std::chrono::duration<double>(timeFromStart).count());
-            std::strftime(mbstr, sizeof(mbstr), "%X", gmtime(&tfs));
-            std::fprintf(stderr, "%s|", mbstr);
+            std::strftime(mbstr1, sizeof(mbstr1), "%X", gmtime(&tfs));
             int timeLast;
             if (rate != 0) {
                 // 剩余时间的估计是用这次的速度和未完成的数量进行估计
@@ -152,21 +148,20 @@ namespace itp
                 timeLast = 0;
             }
             tfs = timeLast;
-            std::strftime(mbstr, sizeof(mbstr), "%X", gmtime(&tfs));
-            std::fprintf(stderr, "%s", mbstr);
-            std::fprintf(stderr, "%s", color::reset);
+            std::strftime(mbstr2, sizeof(mbstr2), "%X", gmtime(&tfs));
+
+            fmt::print(stderr, "{}{:.1f}%|{:"s + sign + ">{}}{:>{}}{:.1f}MHz|{}|{}{}",
+                color::green, present, '>', barWidth, '|', this->ncols - barWidth, rate / 1000, mbstr1, mbstr2, color::reset);
         }
 
         void style2(double present)
         {
-            std::fprintf(stderr, "%s", color::green);
             int centerWidth = 6;
             int leftWidth = int((this->ncols - centerWidth) * present / 100.0);
             int rightWidth = this->ncols - leftWidth - centerWidth;
-            for (int i = 0; i < leftWidth; i++) std::fprintf(stderr, "%c", '=');
-            std::fprintf(stderr, ">%.1f%%", present);
-            for (int i = 0; i < rightWidth; i++) std::fprintf(stderr, "%c", '-');
-            std::fprintf(stderr, "%s", color::reset);
+
+            fmt::print(stderr, "{}{:=>{}}{:.1f}%{:->{}}{}",
+                color::green, '>', leftWidth, present, '-', rightWidth, color::reset);
         }
     };
 }

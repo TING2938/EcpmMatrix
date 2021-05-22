@@ -11,7 +11,7 @@
 
 namespace itp
 {
-	class Timer
+	class Timeit
 	{
 	public:
 		using nanoseconds = std::chrono::duration<double, std::nano>;   // ns
@@ -25,7 +25,7 @@ namespace itp
 		std::chrono::steady_clock::time_point _begin, _end;
 
 	public:
-		Timer() : _begin(std::chrono::steady_clock::time_point()),
+		Timeit() : _begin(std::chrono::steady_clock::time_point()),
 			_end(std::chrono::steady_clock::time_point())
 		{}
 
@@ -56,13 +56,12 @@ namespace itp
 			std::cout
 				<< front
 				<< std::chrono::duration_cast<Duration>(_end - _begin).count()
-				<< back
-				<< '\n';
+				<< back;
 		}
 
 	};
 
-	class TimingActuator
+	class Timer
 	{
 		std::atomic<bool> active{ true };
 

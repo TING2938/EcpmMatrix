@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include <unordered_map>
+#include <omp.h>
 
 class Conp
 {
@@ -24,8 +25,6 @@ public:
     void calc_rSlab();
 
     void calc_rKspace();
-
-    void calc_Matrix();
 
     void get_EcpmMatrix();
 
@@ -85,7 +84,7 @@ public:
     bool showProgressBar = true;
     int progressBarStyle = 1;
 
-    static std::unordered_map<double, double> cache;
+    std::unordered_map<double, double> cache;
     // Fourier coefficient of the Gaussian function used in the Ewald sum
     std::vector<std::array<double, 3>> fcCache1;
     std::vector<std::vector<std::vector<double>>> fcCache2;  

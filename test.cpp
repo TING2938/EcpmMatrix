@@ -1,28 +1,40 @@
-#include <iostream>
-#include <thread>
+#include <map>
 #include <itp/core>
 #include <itp/color>
 #include <itp/timer>
+using std::map;
 
-void func()
+
+bool findDict(const map<double, map<double, map<double, double>>>& dict, double x, double y, double z)
 {
-    fmt::print("In my turn\n");
+    auto dx = dict.find(x);
+    if (dx != dict.end()) {
+        auto dy = dx->second.find(y);
+        if (dy != dx->second.end()) {
+            auto dz = dy->second.find(z);
+            if (dz != dy->second.end()) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
 }
+
 
 int main()
 {
-    itp::Timer timer;
-    itp::TimingActuator ta;
-    int ii = 2;
-    timer.start();
-    std::printf("%*cafdf\n", 5, '#');
-    ta.setInterval(1000, &func);
-    timer.stop();
-    fmt::print("spend {} s\n", timer.span());
-    ii++;
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    map<double, map<double, map<double, double>>> dict;
 
 
-    std::vector<int> vec;
-    vec.emplace_back(1);
+    dict[2.3][4.5][6.9] = 3.56;
+
+    bool a = findDict(dict, 2.3, 4.5, 6.93);
+    bool b = findDict(dict, 2.3, 4.5, 6.9);
+    // fmt::print("{} {} {}\n", findDict(dict, 2.3, 4.5, 6.93), a, b);
+    fmt::print("{} {}\n", findDict(dict, 2.3, 4.5, 6.93), dict[2.3][4.5][6.93]);
 }
