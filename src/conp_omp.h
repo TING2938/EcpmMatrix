@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <omp.h>
 
+
 class Conp
 {
 public:
