@@ -5,7 +5,6 @@
 #include <omp.h>
 #include <itp/utility>
 #include <itp/timer>
-
 #include "fast_math.h"
 #include "conp.h"
 
