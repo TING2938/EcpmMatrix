@@ -191,7 +191,7 @@ namespace itp
          * @param msg 子程序说明
          * @param func 子程序执行的函数
         */
-        template <typename Func, typename... Valty>
+        template <typename Func>
         void addSubProgram(std::string str, std::string msg, Func&& func)
         {
             if (_printHelpMain) {

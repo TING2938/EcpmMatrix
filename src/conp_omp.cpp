@@ -2,11 +2,10 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
-#include <omp.h>
 #include <itp/utility>
 #include <itp/timer>
 #include "fast_math.h"
-#include "conp.h"
+#include "conp_omp.h"
 
 
 Conp::Conp(int gc, char** gv) : argc(gc), argv(gv)
