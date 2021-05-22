@@ -2,7 +2,6 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
-#include <omp.h>
 #include <itp/utility>
 #include <itp/timer>
 #include "fast_math.h"
@@ -103,46 +102,32 @@ void Conp::calc_rSlab()
 
 void Conp::calc_rKspace()
 {
-    for (int i = 0; i != nthread; ++i) {
-        thread.emplace_back(&Conp::kspaceThreadFunc, this, i);
-    }
-    for (auto&& i : thread) {
-        if (i.joinable())
-            i.join();
-    }
+    omp_lock_t lock;
+    omp_init_lock(&lock);
+
+#pragma omp parallel for schedule(dynamic,2) num_threads(nthread)
     for (int ii = 0; ii < natoms; ii++) {
-        for (int jj = 0; jj < ii; jj++) {
-            rMatrix(jj, ii) = rMatrix(ii, jj);
-        }
-    }
-    rMatrix *= (32.0 * itp::pi / volume);
-}
-
-void Conp::kspaceThreadFunc(int rank)
-{
-    int k, l, m;
-    double sqk;
-    double fc; // Fourier coefficient of the Gaussian function used in the Ewald sum
-    double dx[3];
-    double hash;
-
-    for (int ii = rank; ii < natoms; ii += nthread) {
         for (int jj = 0; jj <= ii; ++jj) { // loop for each atom
+            int k, l, m;
+            double sqk;
+            double fc; // Fourier coefficient of the Gaussian function used in the Ewald sum
+            double dx[3];
+            double hash;
 
             for (m = 0; m < 3; m++) {
                 dx[m] = x(ii, m) - x(jj, m);
             }
             hash = calc_hash(dx);
-            mut.lock();
+            omp_set_lock(&lock);
             auto it = cache.find(hash);
             if (it != cache.end()) {
                 rMatrix(ii, jj) = it->second;
                 cacheHitTimes++;
                 if (showProgressBar) progressBar.update();
-                mut.unlock();
+                omp_unset_lock(&lock);
                 continue;
             }
-            mut.unlock();
+            omp_unset_lock(&lock);
 
             // (k,0,0), (0,l,0), (0,0,m)
             for (m = 1; m <= kmax; m++) {
@@ -214,12 +199,22 @@ void Conp::kspaceThreadFunc(int rank)
                     }
                 }
             }
-            mut.lock();
+            omp_set_lock(&lock);
             cache[hash] = rMatrix(ii, jj);
             if (showProgressBar) progressBar.update();
-            mut.unlock();
+            omp_unset_lock(&lock);
         }
     }
+
+    omp_destroy_lock(&lock);
+
+#pragma omp parallel for num_threads(nthread)
+    for (int ii = 0; ii < natoms; ii++) {
+        for (int jj = 0; jj < ii; jj++) {
+            rMatrix(jj, ii) = rMatrix(ii, jj);
+        }
+    }
+    rMatrix *= (32.0 * itp::pi / volume);
 }
 
 void Conp::calcKspaceFcCache()
@@ -302,7 +297,7 @@ void Conp::get_EcpmMatrix()
     getopt(b3dc, "-3dc", true, "3d(0) or 3dc(1)");
 
     // optional 
-    nthread = std::thread::hardware_concurrency();
+    nthread = omp_get_max_threads();
     getopt(nthread, "-thread", false, "number of thread");
     getopt(cutoff, "-cutoff", false, "cut off(nm)");
     getopt(binary, "-binary", false, "output binary file ?");

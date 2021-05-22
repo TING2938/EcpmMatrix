@@ -1,11 +1,9 @@
-﻿#ifndef __CONP_H__
-#define __CONP_H__
+﻿#ifndef __CONP_OMP_H__
+#define __CONP_OMP_H__
 
 #include <itp/core>
 #include <itp/getopt>
 #include <itp/progressbar>
-#include <thread>
-#include <mutex>
 #include <unordered_map>
 #include <omp.h>
 
@@ -37,7 +35,6 @@ public:
     void cvtTextToBinaryFile();
 
 public:
-    void kspaceThreadFunc(int rank);
 
     void calcKspaceFcCache();
 
@@ -72,13 +69,11 @@ public:
 
     Eigen::ArrayX3d x;
     Eigen::ArrayXXd rMatrix, rInvMatrix;
-    std::vector<std::thread> thread;
 
     double unitk[3], squnitk[3];
     int kmax;
     double gsqmx;
     double g_ewald_sq_inv;
-    std::mutex mut;
     int cacheHitTimes = 0;
     itp::ProgressBar progressBar;
     bool showProgressBar = true;
@@ -91,4 +86,4 @@ public:
 };
 
 
-#endif // !__CONP_H__
+#endif // !__CONP_OMP_H__

@@ -1,4 +1,0 @@
-#!/usr/bin/env bash 
-g++ calcMatrix_omp.cpp src/conp_omp.cpp -I include/ -o calcMatrix_omp -O3 -std=c++17 -fopenmp -pthread -lstdc++fs
-
-
