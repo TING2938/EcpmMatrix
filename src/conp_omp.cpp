@@ -298,7 +298,7 @@ void Conp::get_EcpmMatrix()
     getopt(b3dc, "-3dc", true, "3d(0) or 3dc(1)");
 
     // optional 
-    nthread = std::thread::hardware_concurrency();
+    nthread = omp_get_max_threads();
     getopt(nthread, "-thread", false, "number of thread");
     getopt(cutoff, "-cutoff", false, "cut off(nm)");
     getopt(binary, "-binary", false, "output binary file ?");
