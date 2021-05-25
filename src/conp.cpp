@@ -502,7 +502,7 @@ void Conp::cvtBinaryToTextFile()
 
     std::ifstream inputFile(inputFileName, std::ios::binary);
     auto begin = inputFile.tellg();
-    inputFile.seekg(std::ios::end);
+    inputFile.seekg(0, std::ios::end);
     auto length = (inputFile.tellg() - begin) / sizeof(float);
     inputFile.seekg(std::ios::beg);
     std::vector<float> data(length);
